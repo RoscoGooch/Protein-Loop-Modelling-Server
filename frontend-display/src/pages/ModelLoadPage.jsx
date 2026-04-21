@@ -1,13 +1,11 @@
-import LoadModelButton from "../components/LoadModelButton";
-import SubmitModelButton from "../components/SubmitModelButton";
+import SubmitModel from "../components/SubmitModel";
 
 const ModelLoadPage = () => {
     return (
-    <>
-        <h1>ModelLoadPage</h1>
-        <LoadModelButton/>
-        <SubmitModelButton/>
-    </>
+    <div id="model-load">
+        <h1>Load Model</h1>
+        <SubmitModel/>
+    </div>
     )
 }
 

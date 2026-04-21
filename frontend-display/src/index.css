@@ -35,19 +35,45 @@ h1 {
   line-height: 1.1;
 }
 
+#protein-model {
+  border: 5px solid transparent;
+  border-color: #1a1a1a;
+}
+
+#model-display {
+  justify-content: center;
+  width: 90vw;
+  margin-left: 10px;
+  margin-top: 10px;
+}
+
+#model-submit {
+  justify-content: center;
+}
+
+#model-load {
+  justify-content: center;
+  width: 90vw;
+  margin-left: 10px;
+  margin-top: 10px;
+}
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;
+  border-color: #1a1a1a;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #08abdc;
   cursor: pointer;
   transition: border-color 0.25s;
+
+  
 }
 button:hover {
-  border-color: #646cff;
+  background-color: #646cff;
 }
 button:focus,
 button:focus-visible {
