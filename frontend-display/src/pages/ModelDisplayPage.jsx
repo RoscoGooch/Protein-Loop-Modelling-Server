@@ -1,11 +1,9 @@
 import ProteinModelView from "../components/ProteinModelView";
-import RotateSlider from "../components/RotateSlider";
-import ZoomSlider from "../components/ZoomSlider";
 import ToggleAngleForm from "../components/ToggleAngleForm";
 import { useLocation } from "react-router-dom";
 
 const ModelDisplayPage = () => {
-    const location = useLocation();
+    /*const location = useLocation();
 
     let modelData = location.state?.data1;
 
@@ -25,6 +23,13 @@ const ModelDisplayPage = () => {
         <RotateSlider/>
         <h3>Segment beginning = {segbeg}</h3>
         <h3>Segment end = {segend}</h3>
+    </div>
+    )*/
+
+    return(
+    <div id='model-display'>
+        <ProteinModelView/>
+        <ToggleAngleForm/>
     </div>
     )
 }
