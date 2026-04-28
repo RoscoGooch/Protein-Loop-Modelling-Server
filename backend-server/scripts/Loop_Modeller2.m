@@ -58,7 +58,7 @@ if psi_intersect ~= 0
 end
 
 % call Segment_prep
-[segstruct,natseg,nres,npep,nbond,ntors,nphipsi,n_notconstr,nfree,phipsi_index,phipsi_notconstr_index,tors_change_index,tors_change_target,constrset]=Segment_prep(pdbcode,chain,segbeg,segend,target_residues_phi,target_residues_psi,constr_residues_phi,constr_residues_psi);
+[packedsegstruct,natseg,nres,npep,nbond,ntors,nphipsi,n_notconstr,nfree,phipsi_index,phipsi_notconstr_index,tors_change_index,tors_change_target,constrset]=Segment_prep(pdbcode,chain,segbeg,segend,target_residues_phi,target_residues_psi,constr_residues_phi,constr_residues_psi);
 
 % stop if nfree is equal to or less than zero
 if nfree <= 0
@@ -67,7 +67,7 @@ if nfree <= 0
 end
 %% Determine internal coordinates
 
-[xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial]=PDBStruct_to_Internal_func2(nres,segstruct);
+[xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial]=PDBStruct_to_Internal_func2(nres,packedsegstruct);
 
 %% Set target torsion angles
 
@@ -97,7 +97,7 @@ distfinal
 %% Convert to Cartesian coordinate trajectory
 
 %this function will produce side chain coordinates as well
-[segstruct_traj]=Make_PDBstruct_Tortraj_func(nmod,natseg,nres,segstruct,xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial,torsmod);
+[segstruct_traj]=Make_PDBstruct_Tortraj_func(nmod,natseg,nres,packedsegstruct,xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial,torsmod);
 
 %% Output structure trajectory
 

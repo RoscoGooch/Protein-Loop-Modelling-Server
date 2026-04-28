@@ -80,6 +80,22 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+#modelSubmit {
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  font-size: medium;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 10px;
+  border: 2px;
+
+}
+
+#modelSubmit input {
+  width: 60px;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

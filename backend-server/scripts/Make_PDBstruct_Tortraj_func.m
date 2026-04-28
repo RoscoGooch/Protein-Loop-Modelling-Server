@@ -12,7 +12,9 @@
 % and B to calculate the side chain coordinates in system coordinates.
 
 
-function [segstruct_traj]=Make_PDBstruct_Tortraj_func(nmod,natseg,nres,segstruct,xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial,torstraj)
+function [traj_output]=Make_PDBstruct_Tortraj_func(nmod,natseg,nres,packedsegstruct,xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors_initial,torstraj,pdb_outname)
+
+segstruct=unpackStruct(packedsegstruct);
 
 %% Calculate torsions and angles related to virtual atom
 %atlist_side
@@ -229,3 +231,5 @@ for imod=1:nmod
         segstruct_traj.Model(imod+1).Atom(iatm).Z=z_trans(iatm);
     end
 end
+
+traj_output=writeFile(pdb_outname, segstruct_traj);

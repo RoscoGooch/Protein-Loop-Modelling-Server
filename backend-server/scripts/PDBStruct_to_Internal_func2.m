@@ -2,7 +2,9 @@
 
 % Given a PDB struct and chain identifier it calculates bond angles and torsions
 
-function [xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors]=PDBStruct_to_Internal_func2(nres,segstruct)
+function [xn,yn,zn,xca,yca,zca,xc,yc,zc,xo,yo,zo,nside,xside,yside,zside,atlistN,atlistCA,atlistC,atlistO,atlist_side,lengs,angs,tors]=PDBStruct_to_Internal_func2(nres,packedsegstruct)
+
+segstruct=unpackStruct(packedsegstruct)
 
 %% determine backbone atoms
 

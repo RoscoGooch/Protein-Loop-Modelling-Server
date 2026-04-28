@@ -16,7 +16,7 @@ const SubmitModel = () => {
         .post(MODEL_URL, entries)
         .then((response) => {
             console.log(response.data);
-            navigate("/displayModel", {state: {data1: response.data}});
+            navigate("/display_model", {state: {data1: response.data}});
             return toast.success("Successfully submitted model!");
         })
         .catch((error) => {
@@ -27,13 +27,9 @@ const SubmitModel = () => {
 
     return <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
         <p>Chain: </p>
-        <input type="char" name="chain" id="chain" required></input>
+        <input type="text" name="chain" id="chain" required></input>
         <p>Code: </p>
-        <input type="string" name="pdbcode" id="pdbcode" required></input>
-        <p>Segment beginning: </p>
-        <input type="int" name="segbeg" id="segbeg" required></input>
-        <p>Segment end: </p>
-        <input type="int" name="segend" id="segend" required></input>
+        <input type="text" name="pdbcode" id="pdbcode" required></input>
         <button type="submit">Submit model</button>
     </form>
     

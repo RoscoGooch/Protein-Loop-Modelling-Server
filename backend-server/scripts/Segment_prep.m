@@ -4,13 +4,12 @@
 % the residues in the segment and creates arrays for conversion between residues,
 % and phi or psi indexing and torsion indexing which includes omegas
 
-function [segstruct,natseg,nres,npep,nbond,ntors,nphipsi,n_notconstr,nfree,phipsi_index,phipsi_notconstr_index,tors_change_index,tors_change_target,constrset]=Segment_prep(pdbcode,chain,segbeg,segend,target_residues_phi,target_residues_psi,constr_residues_phi,constr_residues_psi)
+function [packedsegstruct,natseg,nres,npep,nbond,ntors,nphipsi,n_notconstr,nfree,phipsi_index,phipsi_notconstr_index,tors_change_index,tors_change_target,constrset]=Segment_prep(pdbcode,chain,segbeg,segend,target_residues_phi,target_residues_psi,constr_residues_phi,constr_residues_psi)
 
 % Get PDB file
 Protein=getpdb(pdbcode);
 %pdbwrite([pdbcode '.pdb'],Protein);
 %Protein=pdbread([pdbcode '.pdb']);
-
 
 % Create structure for segment
 seglen=segend-segbeg+1;
@@ -29,6 +28,8 @@ for iat=1:natom
         segstruct.Model(1).Atom(iatseg)=Protein.Model(1).Atom(iat);
     end
 end
+
+packedsegstruct = packStruct(segstruct);
 
 nres=ires;
 natseg=iatseg;
