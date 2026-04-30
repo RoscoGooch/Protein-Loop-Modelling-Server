@@ -1,21 +1,23 @@
 import ProteinModelView from "../components/ProteinModelView";
-import ToggleAngleForm from "../components/ToggleAngleForm";
 import { useLocation } from "react-router-dom";
 import { Navigate } from "react-router-dom";
+import DefaultProtein from "../components/DefaultProtein";
 
-const ModelViewPage = () => {
-    function goToDisplay() {
-        navigate("/display_model");
+const ModelViewPage = (data) => {
+    function goToLoad() {
+        navigate("/load_model");
     }
     const location = useLocation();
 
     let modelData = location.state?.data1;
+    console.log(modelData);
+
+    let pdbcode='1adg';
     
     return (
     <div id='model-display'>
-        <ProteinModelView data={modelData}/>
-        <ToggleAngleForm/>
-        <button onClick={goToDisplay}>Change chain and code</button>
+        <DefaultProtein data={pdbcode}/>
+        <button onClick={goToLoad}>Change chain and code</button>
     </div>
     )
 }

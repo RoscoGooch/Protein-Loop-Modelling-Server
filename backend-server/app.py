@@ -2,7 +2,10 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import numpy as np
 import matlab.engine
+import os
 from Bio.PDB.ic_rebuild import write_PDB
+from Bio.PDB import PDBParser, PPBuilder, PDBList
+import math
 
 eng = matlab.engine.start_matlab()
 eng.cd(r'scripts', nargout=0)
@@ -10,54 +13,57 @@ eng.cd(r'scripts', nargout=0)
 app = Flask(__name__)
 CORS(app)
 
-chain = 'A'
-pdbcode = '1adg'
-pdb_outname = 'LADH_loop_movement.pdb'
+DOWNLOAD_FOLDER = "PDB_files"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+app.config["DOWNLOAD_FOLDER"] = DOWNLOAD_FOLDER
 
-segbeg = 290
-segend = 301
+@app.route('/setup-data', methods=['POST'])
+def setup_data():
+    # Create an instance of the PDBList class
+    pdb_list = PDBList()
+    # Specify the PDB ID of the structure you want to download
+    iddata = request.get_json()
+    pdb_id = (iddata['pdbcode'])
+    # Download the file using the retrieve_pdb_file method
+    pdb_filename = pdb_list.retrieve_pdb_file(pdb_id, pdir="PDB_files", file_format="pdb")
+    structure = PDBParser().get_structure("downloads", pdb_filename)
+    list_of_chains = [chain.id for chain in structure.get_chains()]
+    return {
+        "pdb_id": pdb_id,
+        "chains": list_of_chains
+    }
 
-def get_pdbcode():
-    return pdbcode
-
-def get_pdb_outname():
-    return pdb_outname
-
-def get_chain():
-    return chain
-
-def get_segbeg():
-    return segbeg
-
-def get_segend():
-    return segend
-
-def set_pdb_structure(thiscode, thischain):
-    pdbcode = thiscode
-    chain = thischain
-
-def set_segbeg_segend(thisbeg, thisend):
-    segbeg = thisbeg
-    segend = thisend
+@app.route('/retrieve-angles', methods=['POST'])
+def retrieve_angles():
+    # Create an instance of the PDBList class
+    pdb_list = PDBList()
+    # Specify the structures you want to get angles from
+    structure_details = request.get_json()
+    end_pdb_id = (structure_details['pdbcode_end'])
+    segbeg = int((structure_details['segbeg']))
+    segend = int((structure_details['segend']))
+    chain = (structure_details['start_chain'])
+    # Download the file using the retrieve_pdb_file method
+    end_pdb_filename = pdb_list.retrieve_pdb_file(end_pdb_id, pdir="PDB_files", file_format="pdb")
+    end_structure = PDBParser().get_structure("downloads", end_pdb_filename)[0][chain]
+    phi_angles = list()
+    psi_angles = list()
+    ppb = PPBuilder()
+    for pp in ppb.build_peptides(end_structure):
+        phi_psi = pp.get_phi_psi_list()[segbeg:segend]
+        for i, (phi, psi) in enumerate(phi_psi):
+            this_phi_angle = None if phi is None else math.degrees(phi)
+            this_psi_angle = None if psi is None else math.degrees(psi)
+            phi_angles.append(this_phi_angle)
+            psi_angles.append(this_psi_angle)
+    return {
+        "phi_angles": psi_angles,
+        "psi_angles": psi_angles
+    }
 
 @app.route("/")
 def home():
     return "<p>Backend server</p>"
-
-@app.route('/load-model', methods=['POST'])
-def load_model():
-    #read model file
-    #look for relevant info
-    modeldata = request.get_json()
-    set_pdb_structure(modeldata['pdbcode'], modeldata['chain'])
-    set_segbeg_segend(modeldata['segbeg'], modeldata['segend'])
-
-    #test info works, then return model
-    valid = True
-    if valid == True:
-        return [modeldata['pdbcode'], modeldata['chain'], modeldata['segbeg'], modeldata['segend']]
-    else:
-        return "Error"
 
 @app.route('/update-angles', methods=['POST'])
 def update_angles():

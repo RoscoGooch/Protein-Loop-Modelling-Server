@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { HomeLayoutPage, ErrorPage, IndexPage, ModelLoadPage, ModelDisplayPage, ModelViewPage} from './pages/index';
+import { HomeLayoutPage, ErrorPage, IndexPage, ModelLoadPage, ModelViewPage} from './pages/index';
 
 export const router = createBrowserRouter([
     {
@@ -15,11 +15,7 @@ export const router = createBrowserRouter([
                 path: "/load_model",
                 element: <ModelLoadPage />
             },
-            {
-                path: "/display_model",
-                element: <ModelDisplayPage />
-            },
-            {   path: "/toggled_model",
+            {   path: "/display_model",
                 element: <ModelViewPage />
             }
         ]    

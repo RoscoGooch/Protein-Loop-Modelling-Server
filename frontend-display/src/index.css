@@ -96,6 +96,16 @@ button:focus-visible {
   width: 60px;
 }
 
+.angleSelectBox {
+  width: 200px;
+  height: 400px;
+  font-size: large;
+  text-align: center;
+  border-color: black;
+  border-width: 3.5px;
+  background-color: #a4a6c5;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
