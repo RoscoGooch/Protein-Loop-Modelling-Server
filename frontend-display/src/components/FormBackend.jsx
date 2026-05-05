@@ -52,10 +52,12 @@ const GetChain = ({ onSubmit }) => {
     }
 
     return <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
-        <label className="form-label">
-            <p>PDBCode of start file:</p>
-            <input id="pdbcode" name="pdbcode" type="string" required></input>
-        </label>
+        <div className="formItem">
+            <label className="form-label">
+                <p>PDBCode of start file:</p>
+                <input id="pdbcode" name="pdbcode" type="string" required></input>
+            </label>
+        </div>
         <button>Submit start file</button>
     </form>
 }
@@ -92,6 +94,7 @@ const GetAngles = ({ data, onSubmit }) => {
     }
 
     return <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
+        <div className="formItem">
         <label className="form-label">
             <p>Select chain: </p>
             <select onChange={(e) => setStartChain(e.target.value)} value={startChain} id="start_chain" name="start_chain" required>
@@ -108,6 +111,7 @@ const GetAngles = ({ data, onSubmit }) => {
             <p>Segment end:</p>
             <input id="segend" name="segend" type="int" required></input>     
         </label>
+        </div>
         <button>Submit details</button>
     </form>
 }

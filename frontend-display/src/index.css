@@ -122,6 +122,12 @@ button:focus-visible {
 
 }
 
+.formItem {
+  text-align: center;
+  background-color: #64c1ff;
+  margin: 10px;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -336,6 +342,14 @@ th {
   background-color: #213547;
   color: #f9f9f9;
   font-size: 2em;
+  margin-bottom: 15px;
+}
+
+.form p{
+  text-align: center;
+  font-size: 1em;
+  background-color: #646cff;
+  margin-bottom: 10px;
 }
 
 #angleSelect {

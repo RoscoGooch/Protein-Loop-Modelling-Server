@@ -1,7 +1,10 @@
 import UserContainer from "../components/UserContainer";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const IndexPage = () => {
+    const navigate = useNavigate();
+
     const {isAuthenticated, loginWithRedirect, logout, user, isLoading} = useAuth0();
     function goToLoad() {
         navigate("/load_model");
