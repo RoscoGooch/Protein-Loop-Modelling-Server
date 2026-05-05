@@ -1,9 +1,12 @@
-import ProteinModelView from "../components/ProteinModelView";
-import { useLocation } from "react-router-dom";
-import { Navigate } from "react-router-dom";
-import DefaultProtein from "../components/DefaultProtein";
+import ProteinModelBackend from "../components/ProteinModelBackend";
+import ModelStatsBox from "../components/ModelStatsBox";
+import { useLocation, useNavigate } from "react-router-dom";
+import {useState, useEffect} from "react";
+import TopHeader from "../components/TopHeader";
 
 const ModelViewPage = (data) => {
+    const navigate = useNavigate();
+
     function goToLoad() {
         navigate("/load_model");
     }
@@ -12,11 +15,13 @@ const ModelViewPage = (data) => {
     let modelData = location.state?.data1;
     console.log(modelData);
 
-    let pdbcode='1adg';
+    const [modelReady, setModelReady] = useState(false);
     
     return (
     <div id='model-display'>
-        <DefaultProtein data={pdbcode}/>
+        <TopHeader/>
+        <ProteinModelBackend data={modelData} onReady={() => setModelReady(true)}/>
+        {modelReady && (<ModelStatsBox data={modelData}/>)}
         <button onClick={goToLoad}>Change chain and code</button>
     </div>
     )

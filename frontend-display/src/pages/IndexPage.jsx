@@ -1,11 +1,18 @@
-import LoginForm from "../components/LoginForm"
+import UserContainer from "../components/UserContainer";
+import { useAuth0 } from "@auth0/auth0-react";
 
 const IndexPage = () => {
+    const {isAuthenticated, loginWithRedirect, logout, user, isLoading} = useAuth0();
+    function goToLoad() {
+        navigate("/load_model");
+    }
+
     return (
-    <>
+    <div>
         <h1>Welcome to the protein loop modelling server!</h1>
-        <LoginForm/>
-    </>    
+        <UserContainer user={user} login={loginWithRedirect} logout={logout}/>
+        <button onClick={goToLoad}>Change chain and code</button>
+    </div>    
     )
 }
 

@@ -4,7 +4,8 @@ import numpy as np
 import matlab.engine
 import os
 from Bio.PDB.ic_rebuild import write_PDB
-from Bio.PDB import PDBParser, PPBuilder, PDBList
+from Bio.PDB import PDBParser, PPBuilder, PDBList, PDBIO, Select
+import Bio.PDB
 import math
 
 eng = matlab.engine.start_matlab()
@@ -23,43 +24,107 @@ def setup_data():
     pdb_list = PDBList()
     # Specify the PDB ID of the structure you want to download
     iddata = request.get_json()
-    pdb_id = (iddata['pdbcode'])
+    start_pdb_id = (iddata['pdbcode'])
     # Download the file using the retrieve_pdb_file method
-    pdb_filename = pdb_list.retrieve_pdb_file(pdb_id, pdir="PDB_files", file_format="pdb")
+    pdb_filename = pdb_list.retrieve_pdb_file(start_pdb_id, pdir="PDB_files", file_format="pdb")
+    #get file
     structure = PDBParser().get_structure("downloads", pdb_filename)
+    #find all the chains in the structure
     list_of_chains = [chain.id for chain in structure.get_chains()]
     return {
-        "pdb_id": pdb_id,
+        "start_pdb_id": start_pdb_id,
         "chains": list_of_chains
     }
 
 @app.route('/retrieve-angles', methods=['POST'])
 def retrieve_angles():
-    # Create an instance of the PDBList class
+    #create an instance of the PDBList class
     pdb_list = PDBList()
-    # Specify the structures you want to get angles from
+    #specify the structures you want to get angles from
     structure_details = request.get_json()
-    end_pdb_id = (structure_details['pdbcode_end'])
     segbeg = int((structure_details['segbeg']))
     segend = int((structure_details['segend']))
+    end_pdb_id = (structure_details['pdbcode_end'])
     chain = (structure_details['start_chain'])
-    # Download the file using the retrieve_pdb_file method
+    #download the file using the retrieve_pdb_file method
     end_pdb_filename = pdb_list.retrieve_pdb_file(end_pdb_id, pdir="PDB_files", file_format="pdb")
     end_structure = PDBParser().get_structure("downloads", end_pdb_filename)[0][chain]
-    phi_angles = list()
-    psi_angles = list()
+    #get the phi and psi angles using tbe ppbuilder
     ppb = PPBuilder()
+    phi_map = {}
+    psi_map = {}
+
     for pp in ppb.build_peptides(end_structure):
-        phi_psi = pp.get_phi_psi_list()[segbeg:segend]
-        for i, (phi, psi) in enumerate(phi_psi):
-            this_phi_angle = None if phi is None else math.degrees(phi)
-            this_psi_angle = None if psi is None else math.degrees(psi)
-            phi_angles.append(this_phi_angle)
-            psi_angles.append(this_psi_angle)
-    return {
-        "phi_angles": psi_angles,
-        "psi_angles": psi_angles
+        for residue, (phi, psi) in zip(pp, pp.get_phi_psi_list()):
+            res_id = residue.get_id()[1]
+            phi_map[res_id] = None if phi is None else math.degrees(phi)
+            psi_map[res_id] = None if psi is None else math.degrees(psi)
+
+    phi_trimmed = {
+        res: angle
+        for res, angle in phi_map.items()
+        if segbeg <= res <= segend
     }
+
+    psi_trimmed = {
+        res: angle
+        for res, angle in psi_map.items()
+        if segbeg <= res <= segend
+    }
+
+
+    return {
+        "phi_angles": phi_trimmed,
+        "psi_angles": psi_trimmed
+    }
+
+@app.route('/align-angles', methods=['POST'])
+def align_angles():
+    structure_details = request.get_json()
+    phi_map = (structure_details["phi_angles"])
+    psi_map = (structure_details["psi_angles"])
+    phi_angle_settings = (structure_details['phi_angle_settings'])
+    psi_angle_settings = (structure_details['psi_angle_settings'])
+
+    phi_targets = [
+        int(res) for res, val in phi_angle_settings.items()
+        if val == "targeted"
+    ]
+
+    psi_targets = [
+        int(res) for res, val in psi_angle_settings.items()
+        if val == "targeted"
+    ]
+
+    target_residues_phi = [
+        [res, phi_map[str(res)]]
+        for res in phi_targets
+        if str(res) in phi_map and phi_map[str(res)] is not None
+    ]
+
+    target_residues_psi = [
+        [res, psi_map[str(res)]]
+        for res in psi_targets
+        if str(res) in psi_map and psi_map[str(res)] is not None
+    ]
+
+    constr_residues_phi = [
+        int(res) for res, val in phi_angle_settings.items()
+        if val == "constrained"
+    ]
+
+    constr_residues_psi = [
+        int(res) for res, val in psi_angle_settings.items()
+        if val == "constrained"
+    ]
+
+    return jsonify({
+        "target_residues_phi": target_residues_phi,
+        "target_residues_psi": target_residues_psi,
+        "constr_residues_phi": constr_residues_phi,
+        "constr_residues_psi": constr_residues_psi
+    })
+
 
 @app.route("/")
 def home():
@@ -74,37 +139,25 @@ def update_angles():
 
     #(see page 117 of notebook)
     #Read in protein structure and select segment and residues to change and constrain tic.
-    chain = 'A'
-    pdbcode = '1adg'
-    pdb_outname = 'LADH_loop_movement.pdb'
+    data = request.get_json()
 
-    segbeg = 290
-    segend = 301
+    chain = data.get("start_chain")
+    pdbcode = data.get("pdbcode")
+    segbeg = int(data.get("segbeg"))
+    segend = int(data.get("segend"))
 
-    angledata = request.get_json()
+    target_residues_phi = np.array(data.get("target_residues_phi", []))
+    target_residues_psi = np.array(data.get("target_residues_psi", []))
+    constr_residues_phi = np.array(data.get("constr_residues_phi", []))
+    constr_residues_psi = np.array(data.get("constr_residues_psi", []))
 
-    # in format[resnum1 phi1; resnum2   phi2;..]
-    #target_phi_data = np.array([[angledata['phiAngleTX1'], angledata['phiAngleTY1']], [angledata['phiAngleTX2'], angledata['phiAngleTY2']], [angledata['phiAngleTX3'], angledata['phiAngleTY3']], [angledata['phiAngleTX4'], angledata['phiAngleTY4']]], dtype=np.float64)
-    #target_psi_data = np.array([[angledata['psiAngleTX1'], angledata['psiAngleTY1']], [angledata['psiAngleTX2'], angledata['psiAngleTY2']], [angledata['psiAngleTX3'], angledata['psiAngleTY3']], [angledata['phiAngleTX4'], angledata['phiAngleTY4']]], dtype=np.float64)
-    # in format[resnum1 resnum2...]
-    #constr_phi_data = np.array([angledata['phiAngleC1'], angledata['phiAngleC2']], dtype=np.float64)
-    #constr_psi_data = np.array([angledata['psiAngleC1'], angledata['psiAngleC2']], dtype=np.float64)
+    import os
 
-    #remove values that are 0
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+    os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
-    #target_residues_phi = target_phi_data[~np.all(target_phi_data == 0, axis=1)]
-    #target_residues_psi = target_psi_data[~np.all(target_psi_data == 0, axis=1)]
-
-    #constr_residues_phi = np.delete(constr_phi_data, np.where(constr_phi_data == 0))
-    #constr_residues_psi = np.delete(constr_psi_data, np.where(constr_psi_data == 0))
-
-    # constr_residues_phi = [];
-    target_residues_phi = np.array([[291, -90], [292, -110], [293, -64], [294, -90]])
-    target_residues_psi = np.array([[291, 122], [292, -35], [293, 147]])
-    constr_residues_phi = np.array([295, 296])
-    constr_residues_psi = np.array([294, 295])
-    # constr_residues_psi = [];
-
+    pdb_outname = os.path.join(SCRIPTS_DIR, "LADH_loop_movement.pdb")
 
     #specify number of iterations
     n_iter = 10000
@@ -166,10 +219,48 @@ def update_angles():
     #this function will produce side chain coordinates as well
     traj_output = eng.Make_PDBstruct_Tortraj_func(nmod, natseg, nres, packedsegstruct, xn, yn, zn, xca, yca, zca, xc, yc, zc, xo, yo, zo, nside, xside, yside, zside, atlistN, atlistCA, atlistC, atlistO, atlist_side, lengs, angs, tors_initial, torsmod, pdb_outname)
 
-    path = "scripts/LADH_loop_movement.pdb"
-    return send_file(path, as_attachment=True)
+    return send_file(pdb_outname, mimetype="chemical/x-pdb")
 
 @app.route('/get-pdb-file', methods=['POST'])
 def get_pdb_file():
     path = "scripts/LADH_loop_movement.pdb"
     return send_file(path, as_attachment=True)
+
+@app.route('/get-model-startend', methods=['POST'])
+def get_model_startend():
+    path = "scripts/LADH_loop_movement.pdb"
+
+    start_phi_angles = list()
+    start_psi_angles = list()
+    end_phi_angles = list()
+    end_psi_angles = list()
+
+    structure = PDBParser().get_structure("finalitem", path)
+    models = list(structure.get_models())
+    last_model = models[-1]
+    first_model = models[0]
+
+    ppb = PPBuilder()
+    last_model = ppb.build_peptides(last_model)
+    first_model = ppb.build_peptides(first_model)
+
+    for pp in first_model:
+        phi_psi_list = pp.get_phi_psi_list()
+
+        for phi, psi in phi_psi_list:
+            start_phi_angles.append(None if phi is None else math.degrees(phi))
+            start_psi_angles.append(None if psi is None else math.degrees(psi))
+
+    for pp in last_model:
+        phi_psi_list = pp.get_phi_psi_list()
+
+        for phi, psi in phi_psi_list:
+            end_phi_angles.append(None if phi is None else math.degrees(phi))
+            end_psi_angles.append(None if psi is None else math.degrees(psi))
+
+    return {
+        "start_model_phi_angles": start_phi_angles,
+        "start_model_psi_angles": start_psi_angles,
+        "end_model_phi_angles": end_phi_angles,
+        "end_model_psi_angles": end_psi_angles
+    }

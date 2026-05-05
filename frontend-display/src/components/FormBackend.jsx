@@ -8,21 +8,21 @@ function FormBackend() {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({});
 
-    const handleStepOneSubmit = (data) => {
+    const startGetAngles = (data) => {
         setFormData((prev) => ({ ...prev, ...data }));
         setStep(2);
     };
 
-    const handleStepTwoSubmit = (data) => {
+    const startChooseTargetAngles = (data) => {
         setFormData((prev) => ({ ...prev, ...data }));
         setStep(3);
     };
 
     return (
         <>
-            {step === 1 && <GetChain onSubmit={handleStepOneSubmit} />}
-            {step === 2 && <GetAngles data={formData} onSubmit={handleStepTwoSubmit}/>}
-            {step === 3 && <ChooseTargetAngles data={formData}/>}
+            {step === 1 && <GetChain onSubmit={startGetAngles} />}
+            {step === 2 && <GetAngles data={formData} onSubmit={startChooseTargetAngles}/>}
+            {step === 3 && <ChooseTargetAngles data={formData} onSubmit={(data) => console.log(data)}/>}
         </>
     );
 }
@@ -113,57 +113,33 @@ const GetAngles = ({ data, onSubmit }) => {
 }
 
 const ChooseTargetAngles = ({ data, onSubmit }) => {
+    const UPDATE_URL = "http://127.0.0.1:5000/align-angles";
     const segbeg = Number(data.segbeg);
     const segend = Number(data.segend);
 
-    const [targetPhiAngles, setSelectedPhiTargets] = useState([]);
-    const [constrainedPhiAngles, setSelectedPhiConstraints] = useState([]);
-    const [targetPsiAngles, setSelectedPsiTargets] = useState([]);
-    const [constrainedPsiAngles, setSelectedPsiConstraints] = useState([]);
-
-    const handlePhiTargetChange = (event) => {
-        setSelectedPhiTargets((prev) => {
-            if (prev.includes(event.target.value)) {
-                return prev.filter(item => item !== event.target.value);
-            } else {
-                return [...prev, event.target.value];
-            }
-        });
-        
-    };
-
-    const handlePhiConstraintChange = (event) => {
-        setSelectedPhiConstraints((prev) => {
-            if (prev.includes(event.target.value)) {
-                return prev.filter(item => item !== event.target.value);
-            } else {
-                return [...prev, event.target.value];
-            }
-        });
-    };
-
-    const handlePsiTargetChange = (event) => {
-        setSelectedPsiTargets((prev) => {
-            if (prev.includes(event.target.value)) {
-                return prev.filter(item => item !== event.target.value);
-            } else {
-                return [...prev, event.target.value];
-            }
-        });
-        
-    };
-
-    const handlePsiConstraintChange = (event) => {
-        setSelectedPsiConstraints((prev) => {
-            if (prev.includes(event.target.value)) {
-                return prev.filter(item => item !== event.target.value);
-            } else {
-                return [...prev, event.target.value];
-            }
-        });
-    };
-
     const values = Array.from({ length: segend - segbeg - 1}, (_, i) => (segbeg + 1 + i));
+
+    const [phiAngleSettings, setPhiAngles] = useState(
+        Object.fromEntries(values.map((num) => [num, "default"])),
+    );
+
+    const [psiAngleSettings, setPsiAngles] = useState(
+        Object.fromEntries(values.map((num) => [num, "default"])),
+    );
+
+    const handlePhiChange = (num, value) => {
+        setPhiAngles((prev) => ({
+            ...prev,
+            [num]: value
+        }));
+    };
+
+    const handlePsiChange = (num, value) => {
+        setPsiAngles((prev) => ({
+            ...prev,
+            [num]: value
+        }));
+    };
 
     const navigate = useNavigate();
 
@@ -171,51 +147,62 @@ const ChooseTargetAngles = ({ data, onSubmit }) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const entries = Object.fromEntries(formData);
-        
+
         const combinedData = {
             ...data,
-            ...entries,
+            phi_angle_settings: phiAngleSettings,
+            psi_angle_settings: psiAngleSettings
         };
-        navigate("/display_model", {state: {data1: combinedData}});
+        axios
+            .post(UPDATE_URL, combinedData)
+            .then((response) => {
+                console.log(response.data);
+                const updatedData = {
+                    ...combinedData,
+                    ...response.data,
+                };
+
+                onSubmit(updatedData);
+                navigate("/display_model", {state: {data1: updatedData}});
+            })
+            .catch((error) => {
+                console.log(error);
+                return toast.error(error.message);
+            });  
     }
+
 
 
     return (
         <>
-            <h2>Select angles to target and constrain</h2>
+            <h2>Select residues to target and constrain</h2>
             <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
-            <h3>Phi Angles to target to values in closed structure:</h3>
-            <select multiple onChange={handlePhiTargetChange} value={targetPhiAngles} className='angleSelectBox'>
-                {values.map((num, index) => (
-                <option key={num} value={num}>
-                    {num}
-                </option>
-                ))}
-            </select>
-            <h3>Phi Angles to constrain to values in open structure:</h3>
-            <select multiple onChange={handlePhiConstraintChange} value={constrainedPhiAngles} className='angleSelectBox'>
-                {values.map((num, index) => (
-                <option key={num} value={num}>
-                    {num}
-                </option>
-                ))}
-            </select>
-            <h3>Psi Angles to target to values in closed structure:</h3>
-            <select multiple onChange={handlePsiTargetChange} value={targetPsiAngles} className='angleSelectBox'>
-                {values.map((num, index) => (
-                <option key={num} value={num}>
-                    {num}
-                </option>
-                ))}
-            </select>
-            <h3>Psi Angles to constrain to values in open structure:</h3>
-            <select multiple onChange={handlePsiConstraintChange} value={constrainedPsiAngles} className='angleSelectBox'>
-                {values.map((num, index) => (
-                <option key={num} value={num}>
-                    {num}
-                </option>
-                ))}
-            </select>
+                <div id="angleSelect">
+                    <h3>Phi angles</h3>
+                    {values.map((num) => (
+                        <div key={`phi_${num}`} id="individualAngle">
+                            <label>Phi angle {num}: </label>
+                            <select value={phiAngleSettings[num]} onChange={(e) => handlePhiChange(num, e.target.value)}>
+                            <option value="default">Default</option>
+                            <option value="constrained">Constrained</option>
+                            <option value="targeted">Targeted</option>
+                            </select>
+                        </div>
+                    ))}
+                </div>
+                <div id="angleSelect">
+                    <h3>Psi angles</h3>
+                    {values.map((num) => (
+                        <div key={`psi_${num}`} id="individualAngle">
+                            <label>Psi angle {num}: </label>
+                            <select value={psiAngleSettings[num]} onChange={(e) => handlePsiChange(num, e.target.value)}>
+                            <option value="default">Default</option>
+                            <option value="constrained">Constrained</option>
+                            <option value="targeted">Targeted</option>
+                            </select>
+                        </div>
+                    ))}
+                </div>
             <button>View model</button>
             </form>
         </>
