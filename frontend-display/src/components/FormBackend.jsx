@@ -20,14 +20,14 @@ function FormBackend() {
 
     return (
         <>
-            {step === 1 && <GetChain onSubmit={startGetAngles} />}
+            {step === 1 && <GetChains onSubmit={startGetAngles} />}
             {step === 2 && <GetAngles data={formData} onSubmit={startChooseTargetAngles}/>}
             {step === 3 && <ChooseTargetAngles data={formData} onSubmit={(data) => console.log(data)}/>}
         </>
     );
 }
 
-const GetChain = ({ onSubmit }) => {
+const GetChains = ({ onSubmit }) => {
     const UPDATE_URL = "http://127.0.0.1:5000/setup-data";
 
     const navigate = useNavigate();
@@ -46,19 +46,24 @@ const GetChain = ({ onSubmit }) => {
             });
         })
         .catch((error) => {
-            console.log(error);
-            return toast.error(error.message);
-        });  
+            const data = error.response?.data;
+            const message = data?.error;
+
+            toast.error(message);
+            return;
+        });
     }
 
     return <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
         <div className="formItem">
             <label className="form-label">
-                <p>PDBCode of start file:</p>
-                <input id="pdbcode" name="pdbcode" type="string" required></input>
+                <p>PDBCode of open loop:</p>
+                <input id="openPdbCode" name="openPdbCode" type="string" required></input>
+                <p>PDBCode of closed loop:</p>
+                <input id="closedPdbCode" name="closedPdbCode" type="string" required></input>
             </label>
         </div>
-        <button>Submit start file</button>
+        <button>Submit PDB files</button>
     </form>
 }
 
@@ -66,12 +71,33 @@ const GetAngles = ({ data, onSubmit }) => {
     const UPDATE_URL = "http://127.0.0.1:5000/retrieve-angles";
     const navigate = useNavigate();
 
-    const [startChain, setStartChain] = useState("");
+    const [openChain, setOpenChain] = useState("");
+    const [closedChain, setClosedChain] = useState("");
 
     const handleSubmit = (e) => {
         e.preventDefault(); 
+
+        
         const formData = new FormData(e.currentTarget);
         const entries = Object.fromEntries(formData); 
+
+        var testBeg = Number(entries.segbeg);
+        var testEnd = Number(entries.segend);
+ 
+        if (testBeg >= testEnd){
+            toast.error("Segment end must be higher than segment beginning");
+            return;
+        };
+
+        if (testBeg < 0 || testEnd < 0 || testBeg % 1 != 0 || testEnd % 1 != 0){
+            toast.error("Segment beginning and segment end must not be negative or a fraction");
+            return;
+        }
+
+        if (testEnd - testBeg < 5){
+            toast.error("Too small a region")
+            return;
+        }
 
         const combinedData = {
             ...data,
@@ -79,7 +105,7 @@ const GetAngles = ({ data, onSubmit }) => {
         };
 
         axios
-            .post(UPDATE_URL, entries)
+            .post(UPDATE_URL, combinedData)
             .then((response) => {
                 console.log(response.data);
                 onSubmit({
@@ -88,24 +114,33 @@ const GetAngles = ({ data, onSubmit }) => {
                 });
             })
             .catch((error) => {
-                console.log(error);
-                return toast.error(error.message);
+                const data = error.response?.data;
+                const message = data?.error;
+
+                toast.error(message);
+                return;
             });  
     }
 
     return <form id="modelSubmit" className="form" onSubmit={handleSubmit}>
         <div className="formItem">
         <label className="form-label">
-            <p>Select chain: </p>
-            <select onChange={(e) => setStartChain(e.target.value)} value={startChain} id="start_chain" name="start_chain" required>
-                {data?.chains?.map((chain) => (
+            <p>Select chain for open loop: </p>
+            <select onChange={(e) => setOpenChain(e.target.value)} value={openChain} id="openChain" name="openChain" required>
+                {data?.open_chains?.map((chain) => (
                 <option key={chain} value={chain}>
                     {chain}
                 </option>
                 ))}
             </select>
-            <p>PDBCode of target file:</p>
-            <input id="pdbcode_end" name="pdbcode_end" type="string" required></input>
+            <p>Select chain for closed loop: </p>
+            <select onChange={(e) => setClosedChain(e.target.value)} value={closedChain} id="closedChain" name="closedChain" required>
+                {data?.closed_chains?.map((chain) => (
+                <option key={chain} value={chain}>
+                    {chain}
+                </option>
+                ))}
+            </select>
             <p>Segment beginning:</p>
             <input id="segbeg" name="segbeg" type="int" required></input>
             <p>Segment end:</p>
@@ -149,13 +184,19 @@ const ChooseTargetAngles = ({ data, onSubmit }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const entries = Object.fromEntries(formData);
+        //check that at least 7 values are being left untargeted
+        const defPhiCount = Object.values(phiAngleSettings).filter(setting => setting === "default").length;
+        const defPsiCount = Object.values(psiAngleSettings).filter(setting => setting === "default").length;
 
+        if (defPhiCount + defPsiCount < 7){
+            toast.error("At least 7 angles must be untargeted.");
+            return;
+        };
+            
         const combinedData = {
             ...data,
-            phi_angle_settings: phiAngleSettings,
-            psi_angle_settings: psiAngleSettings
+            phiAngleSettings: phiAngleSettings,
+            psiAngleSettings: psiAngleSettings
         };
         axios
             .post(UPDATE_URL, combinedData)
@@ -170,8 +211,11 @@ const ChooseTargetAngles = ({ data, onSubmit }) => {
                 navigate("/display_model", {state: {data1: updatedData}});
             })
             .catch((error) => {
-                console.log(error);
-                return toast.error(error.message);
+                const data = error.response?.data;
+                const message = data?.error;
+
+                toast.error(message);
+                return;
             });  
     }
 
@@ -207,6 +251,7 @@ const ChooseTargetAngles = ({ data, onSubmit }) => {
                         </div>
                     ))}
                 </div>
+                <p>At least 7 angles must be left untargeted</p>
             <button>View model</button>
             </form>
         </>

@@ -3,63 +3,103 @@ from flask_cors import CORS
 import numpy as np
 import matlab.engine
 import os
-from Bio.PDB.ic_rebuild import write_PDB
-from Bio.PDB import PDBParser, PPBuilder, PDBList, PDBIO, Select
-import Bio.PDB
+from Bio.PDB import PDBParser, PPBuilder, PDBList, PDBIO, Select, NeighborSearch
 import math
 
+#configure matlab engine
 eng = matlab.engine.start_matlab()
 eng.cd(r'scripts', nargout=0)
 
+#setup flask app
 app = Flask(__name__)
 CORS(app)
 
+#configure folder to download pdb files into
 DOWNLOAD_FOLDER = "PDB_files"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 app.config["DOWNLOAD_FOLDER"] = DOWNLOAD_FOLDER
 
 @app.route('/setup-data', methods=['POST'])
 def setup_data():
-    # Create an instance of the PDBList class
-    pdb_list = PDBList()
-    # Specify the PDB ID of the structure you want to download
+    #retrieve the pdb id desired
     iddata = request.get_json()
-    start_pdb_id = (iddata['pdbcode'])
-    # Download the file using the retrieve_pdb_file method
-    pdb_filename = pdb_list.retrieve_pdb_file(start_pdb_id, pdir="PDB_files", file_format="pdb")
-    #get file
-    structure = PDBParser().get_structure("downloads", pdb_filename)
-    #find all the chains in the structure
-    list_of_chains = [chain.id for chain in structure.get_chains()]
+    open_pdb_id = (iddata['openPdbCode'])
+    closed_pdb_id = (iddata['closedPdbCode'])
+
+    #download the file using retrieve_pdb_file, then get protein structures from files
+    try:
+        open_pdb_filename = PDBList().retrieve_pdb_file(open_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
+        open_structure = PDBParser().get_structure("openProteinStructure", open_pdb_filename)
+    except FileNotFoundError:
+        return jsonify({"error": "PDB File for open loop code not valid"}), 400
+    try:
+        closed_pdb_filename = PDBList().retrieve_pdb_file(closed_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
+        closed_structure = PDBParser().get_structure("closedProteinStructure", closed_pdb_filename)
+    except FileNotFoundError:
+        return jsonify({"error": "PDB File for closed loop code not valid"}), 400
+
+    #check that structures are not too big for the program to run efficiently
+    open_atom_count = list(open_structure.get_atoms())
+    closed_atom_count = list(closed_structure.get_atoms())
+
+    #throw errors if structures too big
+    if len(open_atom_count) > 10000:
+        return jsonify({"error": "Open structure is too big"}), 400
+
+    if len(closed_atom_count) > 10000:
+        return jsonify({"error": "Closed structure is too big"}), 400
+
+    #find all the chain ids in the structure
+    list_of_open_chains = [chain.id for chain in open_structure.get_chains()]
+    list_of_closed_chains = [chain.id for chain in closed_structure.get_chains()]
     return {
-        "start_pdb_id": start_pdb_id,
-        "chains": list_of_chains
+        "open_chains": list_of_open_chains,
+        "closed_chains": list_of_closed_chains,
+
     }
 
 @app.route('/retrieve-angles', methods=['POST'])
 def retrieve_angles():
-    #create an instance of the PDBList class
-    pdb_list = PDBList()
     #specify the structures you want to get angles from
     structure_details = request.get_json()
     segbeg = int((structure_details['segbeg']))
     segend = int((structure_details['segend']))
-    end_pdb_id = (structure_details['pdbcode_end'])
-    chain = (structure_details['start_chain'])
-    #download the file using the retrieve_pdb_file method
-    end_pdb_filename = pdb_list.retrieve_pdb_file(end_pdb_id, pdir="PDB_files", file_format="pdb")
-    end_structure = PDBParser().get_structure("downloads", end_pdb_filename)[0][chain]
+    open_chain = (structure_details['openChain'])
+    closed_chain = (structure_details['closedChain'])
+    open_pdb_id = (structure_details['openPdbCode'])
+    closed_pdb_id = (structure_details['closedPdbCode'])
+
+    # download the file using retrieve_pdb_file, then get protein structures from files
+    try:
+        open_pdb_filename = PDBList().retrieve_pdb_file(open_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
+        open_structure = PDBParser().get_structure("openProteinStructure", open_pdb_filename)[0][open_chain]
+    except FileNotFoundError:
+        return jsonify({"error": "PDB File for open code not valid"}), 400
+    try:
+        closed_pdb_filename = PDBList().retrieve_pdb_file(closed_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
+        closed_structure = PDBParser().get_structure("closedProteinStructure", closed_pdb_filename)[0][closed_chain]
+    except FileNotFoundError:
+        return jsonify({"error": "PDB File for closed code not valid"}), 400
+
     #get the phi and psi angles using tbe ppbuilder
-    ppb = PPBuilder()
     phi_map = {}
     psi_map = {}
 
-    for pp in ppb.build_peptides(end_structure):
+    for pp in PPBuilder().build_peptides(closed_structure):
         for residue, (phi, psi) in zip(pp, pp.get_phi_psi_list()):
             res_id = residue.get_id()[1]
-            phi_map[res_id] = None if phi is None else math.degrees(phi)
-            psi_map[res_id] = None if psi is None else math.degrees(psi)
+            if phi is None:
+                phi_map[res_id] = None
+            else:
+                phi_map[res_id] = math.degrees(phi)
+            if psi is None:
+                psi_map[res_id] = None
+            else:
+                psi_map[res_id] = math.degrees(psi)
+            #phi_map[res_id] = None if phi is None else math.degrees(phi)
+            #psi_map[res_id] = None if psi is None else math.degrees(psi)
 
+    #trim the data to the segbeg and segend to reduce storage space
     phi_trimmed = {
         res: angle
         for res, angle in phi_map.items()
@@ -72,7 +112,6 @@ def retrieve_angles():
         if segbeg <= res <= segend
     }
 
-
     return {
         "phi_angles": phi_trimmed,
         "psi_angles": psi_trimmed
@@ -80,11 +119,12 @@ def retrieve_angles():
 
 @app.route('/align-angles', methods=['POST'])
 def align_angles():
+    #retrieve necessary data from frontend
     structure_details = request.get_json()
     phi_map = (structure_details["phi_angles"])
     psi_map = (structure_details["psi_angles"])
-    phi_angle_settings = (structure_details['phi_angle_settings'])
-    psi_angle_settings = (structure_details['psi_angle_settings'])
+    phi_angle_settings = (structure_details['phiAngleSettings'])
+    psi_angle_settings = (structure_details['psiAngleSettings'])
 
     phi_targets = [
         int(res) for res, val in phi_angle_settings.items()
@@ -132,101 +172,126 @@ def home():
 
 @app.route('/update-angles', methods=['POST'])
 def update_angles():
-    #Reads in PDB structure determines the phi, psi angles and the bond angles and omega torsions angles(The latter two are kept fixed).
-    #A segment is selected as are target phi, psi angles for this segment.
-    #The aim is to get as close to these target phi, psi as possible retaining the fixed end groups.
-    #Some phi, psi angles in the segment may be constrained but at least 7 need to be free. A trajectory in PDB format is output.
+    try:
+        #Some phi, psi angles in the segment may be constrained but at least 7 need to be free. A trajectory in PDB format is output.
 
-    #(see page 117 of notebook)
-    #Read in protein structure and select segment and residues to change and constrain tic.
-    data = request.get_json()
+        #(see page 117 of notebook)
+        #Retrieve necessary data from inputs
+        data = request.get_json()
 
-    chain = data.get("start_chain")
-    pdbcode = data.get("pdbcode")
-    segbeg = int(data.get("segbeg"))
-    segend = int(data.get("segend"))
+        chain = data.get("openChain")
+        pdbcode = data.get("openPdbCode")
+        segbeg = int(data.get("segbeg"))
+        segend = int(data.get("segend"))
 
-    target_residues_phi = np.array(data.get("target_residues_phi", []))
-    target_residues_psi = np.array(data.get("target_residues_psi", []))
-    constr_residues_phi = np.array(data.get("constr_residues_phi", []))
-    constr_residues_psi = np.array(data.get("constr_residues_psi", []))
+        target_residues_phi = np.array(data.get("target_residues_phi", []))
+        target_residues_psi = np.array(data.get("target_residues_psi", []))
+        constr_residues_phi = np.array(data.get("constr_residues_phi", []))
+        constr_residues_psi = np.array(data.get("constr_residues_psi", []))
 
-    import os
+        #setup space to save data to
+        import os
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
-    os.makedirs(SCRIPTS_DIR, exist_ok=True)
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+        os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
-    pdb_outname = os.path.join(SCRIPTS_DIR, "LADH_loop_movement.pdb")
+        pdb_outname = os.path.join(SCRIPTS_DIR, "LADH_loop_movement.pdb")
 
-    #specify number of iterations
-    n_iter = 10000
+        #specify number of iterations
+        n_iter = 10000
 
-    #Do some checking
+        #Do some checking
+        #check not constraining and targeting same torsions
+        phi_intersect = 0
+        psi_intersect = 0
+        if target_residues_phi.size > 0:
+            phi_intersect = len(np.intersect1d(constr_residues_phi, target_residues_phi[:, 0]))
+        if target_residues_psi.size > 0:
+            psi_intersect = len(np.intersect1d(constr_residues_psi, target_residues_psi[:, 0]))
+        if target_residues_phi.size == 0 and target_residues_psi.size == 0:
+            return jsonify({"error": "No torsions are being targeted"}), 400
+        if phi_intersect != 0:
+            return jsonify({"error": "You are targeting and constraining the same phi torsion"}), 400
+        if psi_intersect != 0:
+            return jsonify({"error": "You are targeting and constraining the same psi torsion"}), 400
 
-    #check not constraining and targeting same torsions
-    phi_intersect = 0
-    psi_intersect = 0
-    if target_residues_phi.size > 0:
-        phi_intersect = len(np.intersect1d(constr_residues_phi, target_residues_phi[:, 0]))
-    if target_residues_psi.size > 0:
-        psi_intersect = len(np.intersect1d(constr_residues_psi, target_residues_psi[:, 0]))
-    if target_residues_phi.size == 0 and target_residues_psi.size == 0:
-        return jsonify({"error": "no torsions are being targeted"})
-    if phi_intersect != 0:
-        return jsonify({"error": "you are targeting and constraining the same phi torsion"})
-    if psi_intersect != 0:
-        return jsonify({"error": "you are targeting and constraining the same psi torsion"})
+        #call Segment_prep
+        packedsegstruct, natseg, nres, npep, nbond, ntors, nphipsi, n_notconstr, nfree, phipsi_index, phipsi_notconstr_index, tors_change_index, tors_change_target, constrset = eng.Segment_prep(pdbcode, chain, segbeg, segend, target_residues_phi, target_residues_psi, constr_residues_phi, constr_residues_psi, nargout=14)
 
-    #call Segment_prep
-    packedsegstruct, natseg, nres, npep, nbond, ntors, nphipsi, n_notconstr, nfree, phipsi_index, phipsi_notconstr_index, tors_change_index, tors_change_target, constrset = eng.Segment_prep(pdbcode, chain, segbeg, segend, target_residues_phi, target_residues_psi, constr_residues_phi, constr_residues_psi, nargout=14)
+        #stop if nfree is equal to or less than zero
+        if nfree <= 0:
+            return jsonify({"error": "Zero degrees of freedom, cannot target"}), 400
 
-    #stop if nfree is equal to or less than zero
-    if nfree <= 0:
-        return jsonify({"error": "zero degrees of freedom, cannot target"})
+        #determine internal coordinates
+        xn, yn, zn, xca, yca, zca, xc, yc, zc, xo, yo, zo, nside, xside, yside, zside, atlistN, atlistCA, atlistC, atlistO, atlist_side, lengs, angs, tors_initial = eng.PDBStruct_to_Internal_func2(nres, packedsegstruct, nargout=24)
+        #set target torsion angles
 
-    #Determine internal coordinates
-    xn, yn, zn, xca, yca, zca, xc, yc, zc, xo, yo, zo, nside, xside, yside, zside, atlistN, atlistCA, atlistC, atlistO, atlist_side, lengs, angs, tors_initial = eng.PDBStruct_to_Internal_func2(nres, packedsegstruct, nargout=24)
-    #Set target torsion angles
+        #set target phi and psi angles at their initial values
+        #tors_target = tors_initial;
+        tors_target = np.zeros((int(ntors), 1))
+        #set target values
+        change_as_array = np.array(tors_change_index).astype(int) - 1
+        values = np.array(tors_change_target).flatten()
+        tors_target[change_as_array, 0] = values[change_as_array]
 
-    #set target phi and psi angles at their initial values
-    #tors_target = tors_initial;
-    tors_target = np.zeros((int(ntors), 1))
-    #set target values
-    change_as_array = np.array(tors_change_index).astype(int) - 1
-    values = np.array(tors_change_target).flatten()
-    tors_target[change_as_array, 0] = values[change_as_array]
+        #tors_target_mask is used to mask torsions that are not targeted
+        tors_target_mask = np.zeros((int(ntors), 1))
+        tors_target_mask[change_as_array, 0] = 1.0
 
-    #tors_target_mask is used to mask torsions that are not targeted
-    tors_target_mask = np.zeros((int(ntors), 1))
-    tors_target_mask[change_as_array, 0] = 1.0
+        #Do targeting and get the torsions trajectory
+        n_iterstop, torstraj, tors_final, rmsd_initial, normlamda, delta_targ_final, distfinal = eng.Loop_Target_func2(n_iter, lengs, angs, constrset, npep, nbond, nphipsi, phipsi_notconstr_index, n_notconstr, nfree, tors_initial, tors_target_mask, tors_target, nargout=7)
 
-    #Do targeting and get the torsions trajectory
-    n_iterstop, torstraj, tors_final, rmsd_initial, normlamda, delta_targ_final, distfinal = eng.Loop_Target_func2(n_iter, lengs, angs, constrset, npep, nbond, nphipsi, phipsi_notconstr_index, n_notconstr, nfree, tors_initial, tors_target_mask, tors_target, nargout=7)
+        flat_index = np.array(phipsi_index).astype(int).flatten() - 1
+        delta_phipsi = np.array(delta_targ_final)[flat_index]
 
-    flat_index = np.array(phipsi_index).astype(int).flatten() - 1
-    delta_phipsi = np.array(delta_targ_final)[flat_index]
+        #data = [[tors_initial(phipsi_index)], [tors_final(phipsi_index)], [tors_target(phipsi_index)], [delta_phipsi]]
+        #trajectory = np.array[data]
+        distfinal
 
-    #data = [[tors_initial(phipsi_index)], [tors_final(phipsi_index)], [tors_target(phipsi_index)], [delta_phipsi]]
-    #trajectory = np.array[data]
-    distfinal
+        #Use interpolation on trajectory for output
+        nmod, torsmod = eng.interpol_torstraj_func2(n_iterstop, npep, nphipsi, phipsi_index, tors_initial, tors_final, torstraj, nargout=2)
 
-    #Use interpolation on trajectory for output
-    nmod, torsmod = eng.interpol_torstraj_func2(n_iterstop, npep, nphipsi, phipsi_index, tors_initial, tors_final, torstraj, nargout=2)
+        #Convert to Cartesian coordinate trajectory
 
-    #Convert to Cartesian coordinate trajectory
+        #this function will produce side chain coordinates as well
+        traj_output = eng.Make_PDBstruct_Tortraj_func(nmod, natseg, nres, packedsegstruct, xn, yn, zn, xca, yca, zca, xc, yc, zc, xo, yo, zo, nside, xside, yside, zside, atlistN, atlistCA, atlistC, atlistO, atlist_side, lengs, angs, tors_initial, torsmod, pdb_outname)
 
-    #this function will produce side chain coordinates as well
-    traj_output = eng.Make_PDBstruct_Tortraj_func(nmod, natseg, nres, packedsegstruct, xn, yn, zn, xca, yca, zca, xc, yc, zc, xo, yo, zo, nside, xside, yside, zside, atlistN, atlistCA, atlistC, atlistO, atlist_side, lengs, angs, tors_initial, torsmod, pdb_outname)
+        return send_file(pdb_outname, mimetype="chemical/x-pdb")
+    except Exception as e:
+        return jsonify({"error": "Something went wrong with the calculations: " + str(e)}), 500
 
-    return send_file(pdb_outname, mimetype="chemical/x-pdb")
+@app.route('/collision-check', methods=['GET'])
+def collision_check():
+    path = "scripts/LADH_loop_movement.pdb"
+    structure = PDBParser().get_structure("collisionModel", path)
+    atoms = list(structure.get_atoms())
+    radius = 2
+    collisions = []
+    ns = NeighborSearch(atoms)
+    for res1, res2 in ns.search_all(radius, level='R'):
+        if res1 != res2:
+            min_distance = min(
+                atom1 - atom2
+                for atom1 in res1.get_atoms()
+                for atom2 in res2.get_atoms()
+            )
 
-@app.route('/get-pdb-file', methods=['POST'])
+            collisions.append({
+                "res1": str(res1),
+                "res2": str(res2),
+                "distance": float(min_distance)
+            })
+
+    return jsonify({"collisions": collisions})
+
+
+@app.route('/get-pdb-file', methods=['GET'])
 def get_pdb_file():
     path = "scripts/LADH_loop_movement.pdb"
     return send_file(path, as_attachment=True)
 
-@app.route('/get-model-startend', methods=['POST'])
+@app.route('/get-model-startend', methods=['GET'])
 def get_model_startend():
     path = "scripts/LADH_loop_movement.pdb"
 
@@ -235,28 +300,40 @@ def get_model_startend():
     end_phi_angles = list()
     end_psi_angles = list()
 
-    structure = PDBParser().get_structure("finalitem", path)
+    #get models from the data structure
+    structure = PDBParser().get_structure("finalItem", path)
     models = list(structure.get_models())
-    last_model = models[-1]
-    first_model = models[0]
 
-    ppb = PPBuilder()
-    last_model = ppb.build_peptides(last_model)
-    first_model = ppb.build_peptides(first_model)
+    #get first and last model from the model set, then create them as classes with PPBuilder
+    first_model = PPBuilder().build_peptides(models[0])
+    last_model = PPBuilder().build_peptides(models[-1])
 
+    #get the phi and psi angles from the models
     for pp in first_model:
         phi_psi_list = pp.get_phi_psi_list()
 
         for phi, psi in phi_psi_list:
-            start_phi_angles.append(None if phi is None else math.degrees(phi))
-            start_psi_angles.append(None if psi is None else math.degrees(psi))
+            if phi is None:
+                start_phi_angles.append(None)
+            else:
+                start_phi_angles.append(math.degrees(phi))
+            if psi is None:
+                start_psi_angles.append(None)
+            else:
+                start_psi_angles.append(math.degrees(psi))
 
     for pp in last_model:
         phi_psi_list = pp.get_phi_psi_list()
 
         for phi, psi in phi_psi_list:
-            end_phi_angles.append(None if phi is None else math.degrees(phi))
-            end_psi_angles.append(None if psi is None else math.degrees(psi))
+            if phi is None:
+                end_phi_angles.append(None)
+            else:
+                end_phi_angles.append(math.degrees(phi))
+            if psi is None:
+                end_psi_angles.append(None)
+            else:
+                end_psi_angles.append(math.degrees(psi))
 
     return {
         "start_model_phi_angles": start_phi_angles,

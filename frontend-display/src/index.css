@@ -24,6 +24,9 @@ a:hover {
 
 body {
   margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
   display: flex;
   place-items: top;
   min-width: 320px;
@@ -43,17 +46,20 @@ h1 {
 #model-display {
   justify-content: center;
   width: 90vw;
+  height: 100vh;
   margin-left: 10px;
   margin-top: 10px;
 }
 
 #model-submit {
   justify-content: center;
+  position: fixed;
 }
 
 #model-load {
   justify-content: center;
   width: 90vw;
+  height: 100vh;
   margin-left: 10px;
   margin-top: 10px;
 }
@@ -107,7 +113,7 @@ button:focus-visible {
 }
 
 #statsTable{
-  width: 800px;
+  width: 900px;
   border-color: #1a1a1a;
   margin-top: 10px;
   table-layout: auto;
@@ -352,6 +358,37 @@ th {
   margin-bottom: 10px;
 }
 
+#sample-model-container{
+  border: #050702 5px;
+  display: block;
+  margin-left: 50px;
+}
+
+#openingPage{
+  background-color: #d4d3a3;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  font-size: 1.2em;
+  margin-left: 10px;
+  height: 100%;
+  top: 0;
+  width: 99vw;
+
+}
+
+#startButton{
+  width: 250px;
+  margin-left: 20px;
+}
+
+.protein-model {
+  margin-left: 10px;
+  border: #050702 2px;
+  align-items: center;
+  width: 80vw;
+}
+
 #angleSelect {
   background-color: #64c1ff;
   text-align: center;
@@ -366,6 +403,7 @@ th {
   text-align: center;
   display: flex;
   flex-direction: column;
+  flex: 1;
   font-size: 1em;
   margin: 6px;
 }

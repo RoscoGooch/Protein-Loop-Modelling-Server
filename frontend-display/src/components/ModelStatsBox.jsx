@@ -11,11 +11,11 @@ function ModelStatsBox({data}) {
     //get relevant features out of data
     const segbeg = Number(data.segbeg);
     const segend = Number(data.segend);
-    const phiSettings = data.phi_angle_settings;
-    const psiSettings = data.psi_angle_settings;
+    const phiSettings = data.phiAngleSettings;
+    const psiSettings = data.psiAngleSettings;
 
     useEffect(() => {
-            axios.post(ANGLE_URL).then((response) => {
+            axios.get(ANGLE_URL).then((response) => {
                 console.log(response.data);
                 setAngleData(response.data);
             })
@@ -39,19 +39,19 @@ function ModelStatsBox({data}) {
     return(
         <>
         <h2>Model statistics: </h2>
-        <p>Code: {data.pdbcode}</p>
-        <p>Chain: {data.start_chain}</p>
+        <p>Code: {data.openPdbCode}</p>
+        <p>Chain: {data.openChain}</p>
         <p>Segment start: {segbeg} | Segment end: {segend}</p>
         <table id='statsTable'>
             <thead>
                 <tr>
                     <th>Residue Number</th>
                     <th>Phi Setting</th>
-                    <th>Start Phi Angle</th>
-                    <th>End Phi Angle</th>
+                    <th>Start Phi Angle{`(\u00B0)`}</th>
+                    <th>End Phi Angle{`(\u00B0)`}</th>
                     <th>Psi Setting</th>
-                    <th>Start Psi Angle</th>
-                    <th>End Psi Angle</th>
+                    <th>Start Psi Angle{`(\u00B0)`}</th>
+                    <th>End Psi Angle{`(\u00B0)`}</th>
                 </tr>
             </thead>
 

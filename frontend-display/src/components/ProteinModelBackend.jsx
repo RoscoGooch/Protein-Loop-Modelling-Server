@@ -2,10 +2,12 @@ import { useLocation } from "react-router-dom";
 import {useRef, useEffect, useState} from "react";
 import parse from 'html-react-parser';
 import axios from "axios";
-import {toast} from "react-toastify";
+import {collapseToast, toast} from "react-toastify";
 
 function ProteinModelBackend({data, onReady}) {
     const containerRef = useRef(null);
+
+
     const { endPdbdata, loading } = useEndProteinData(data);
     const [modelLoaded, setModelLoaded] = useState(false);
     
@@ -13,6 +15,8 @@ function ProteinModelBackend({data, onReady}) {
         if (!endPdbdata) return;
 
         setModelLoaded(false);
+
+        containerRef.current.innerHTML = "";
 
         const Info = {
             height: 400,
@@ -43,7 +47,7 @@ function ProteinModelBackend({data, onReady}) {
                 Loading protein...
             </div>
         )}
-        <div ref={containerRef} style={{ display: modelLoaded ? "block" : "none" }}/>
+        <div className='protein-model' ref={containerRef} style={{ display: modelLoaded ? "block" : "none" }}/>
         <p>Powered by JSMol</p>
     </div>
     );
@@ -51,6 +55,7 @@ function ProteinModelBackend({data, onReady}) {
 
 const useEndProteinData = (data) => {
     const ANGLE_URL = "http://127.0.0.1:5000/update-angles";
+    const COLLISION_URL = "http://127.0.0.1:5000/collision-check";
     const [endPdbdata, setEndPdbdata] = useState(null);
     const [loading, setDataLoading] = useState(false);
 
@@ -65,9 +70,18 @@ const useEndProteinData = (data) => {
         .then(async (response) => {
             const text = await response.data.text();
             setEndPdbdata(text);
+
+            return axios.get(COLLISION_URL);
+        })
+        .then((response) => {
+            console.log(response.data);
         })
         .catch((error) => {
-            toast.error(error.message);
+            const data = error.response?.data;
+            const message = data?.error;
+
+            toast.error(message);
+            return;
         })
         .finally(() => {
             setDataLoading(false);
