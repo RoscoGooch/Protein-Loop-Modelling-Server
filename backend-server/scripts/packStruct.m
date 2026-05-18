@@ -25,6 +25,6 @@ function out = packStruct(s)
 
     else
         % base case, such as numerical, char and logical values
-        out = s;.
+        out = s;
     end
 end
