@@ -73,12 +73,12 @@ def retrieve_angles():
     try:
         open_pdb_filename = PDBList().retrieve_pdb_file(open_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
         open_structure = PDBParser().get_structure("openProteinStructure", open_pdb_filename)[0][open_chain]
-    except FileNotFoundError:
+    except Exception:
         return jsonify({"error": "PDB File for open code not valid"}), 400
     try:
         closed_pdb_filename = PDBList().retrieve_pdb_file(closed_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
         closed_structure = PDBParser().get_structure("closedProteinStructure", closed_pdb_filename)[0][closed_chain]
-    except FileNotFoundError:
+    except Exception:
         return jsonify({"error": "PDB File for closed code not valid"}), 400
 
     #get the phi and psi angles using tbe ppbuilder
