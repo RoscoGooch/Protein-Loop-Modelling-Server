@@ -7,12 +7,12 @@ import {collapseToast, toast} from "react-toastify";
 function ProteinModelBackend({data, onReady}) {
     const containerRef = useRef(null);
 
-
-    const { endPdbdata, loading } = useEndProteinData(data);
+    const reportRef = useRef(null);
+    const { endPdbdata, collisionsReport, loading } = useEndProteinData(data);
     const [modelLoaded, setModelLoaded] = useState(false);
     
     useEffect(() => {
-        if (!endPdbdata) return;
+        if (!endPdbdata || !collisionsReport) return;
 
         setModelLoaded(false);
 
@@ -37,7 +37,11 @@ function ProteinModelBackend({data, onReady}) {
 
         containerRef.current.innerHTML = window.Jmol.getAppletHtml("myJmol", Info);
 
-    }, [endPdbdata]);
+        if (collisionsReport.collisions.length > 0){
+            toast.warn("Collision identified in this model");
+        }
+
+    }, [endPdbdata, collisionsReport]);
 
     return (
     <div id='protein-model'>
@@ -57,6 +61,7 @@ const useEndProteinData = (data) => {
     const ANGLE_URL = "http://127.0.0.1:5000/update-angles";
     const COLLISION_URL = "http://127.0.0.1:5000/collision-check";
     const [endPdbdata, setEndPdbdata] = useState(null);
+    const [collisionsReport, setCollisionsReport] = useState(null);
     const [loading, setDataLoading] = useState(false);
 
 
@@ -74,7 +79,9 @@ const useEndProteinData = (data) => {
             return axios.get(COLLISION_URL);
         })
         .then((response) => {
-            console.log(response.data);
+            const collisionsReport = (response.data);
+            setCollisionsReport(collisionsReport);
+            console.log(collisionsReport);
         })
         .catch((error) => {
             const data = error.response?.data;
@@ -89,7 +96,7 @@ const useEndProteinData = (data) => {
 
     }, [data]);
 
-    return {endPdbdata, loading};
+    return {endPdbdata, collisionsReport, loading};
 };
 
 export default ProteinModelBackend;

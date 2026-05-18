@@ -389,6 +389,13 @@ th {
   width: 80vw;
 }
 
+.sample-protein-model {
+  margin-left: 10px;
+  border: #050702 2px;
+  align-items: center;
+  width: 80vw;
+}
+
 #angleSelect {
   background-color: #64c1ff;
   text-align: center;

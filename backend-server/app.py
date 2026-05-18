@@ -30,12 +30,12 @@ def setup_data():
     try:
         open_pdb_filename = PDBList().retrieve_pdb_file(open_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
         open_structure = PDBParser().get_structure("openProteinStructure", open_pdb_filename)
-    except FileNotFoundError:
+    except Exception:
         return jsonify({"error": "PDB File for open loop code not valid"}), 400
     try:
         closed_pdb_filename = PDBList().retrieve_pdb_file(closed_pdb_id, obsolete=False, pdir="PDB_files", file_format="pdb", overwrite=False)
         closed_structure = PDBParser().get_structure("closedProteinStructure", closed_pdb_filename)
-    except FileNotFoundError:
+    except Exception:
         return jsonify({"error": "PDB File for closed loop code not valid"}), 400
 
     #check that structures are not too big for the program to run efficiently
@@ -82,35 +82,24 @@ def retrieve_angles():
         return jsonify({"error": "PDB File for closed code not valid"}), 400
 
     #get the phi and psi angles using tbe ppbuilder
-    phi_map = {}
-    psi_map = {}
+    phi_angles = list()
+    psi_angles = list()
 
     for pp in PPBuilder().build_peptides(closed_structure):
-        for residue, (phi, psi) in zip(pp, pp.get_phi_psi_list()):
-            res_id = residue.get_id()[1]
+        phi_psi_list = pp.get_phi_psi_list()
+
+        for phi, psi in phi_psi_list:
             if phi is None:
-                phi_map[res_id] = None
+                phi_angles.append(None)
             else:
-                phi_map[res_id] = math.degrees(phi)
+                phi_angles.append(math.degrees(phi))
             if psi is None:
-                psi_map[res_id] = None
+                psi_angles.append(None)
             else:
-                psi_map[res_id] = math.degrees(psi)
-            #phi_map[res_id] = None if phi is None else math.degrees(phi)
-            #psi_map[res_id] = None if psi is None else math.degrees(psi)
+                psi_angles.append(math.degrees(psi))
 
-    #trim the data to the segbeg and segend to reduce storage space
-    phi_trimmed = {
-        res: angle
-        for res, angle in phi_map.items()
-        if segbeg <= res <= segend
-    }
-
-    psi_trimmed = {
-        res: angle
-        for res, angle in psi_map.items()
-        if segbeg <= res <= segend
-    }
+    phi_trimmed = phi_angles[segbeg:segend+1]
+    psi_trimmed = psi_angles[segbeg:segend+1]
 
     return {
         "phi_angles": phi_trimmed,
@@ -121,31 +110,22 @@ def retrieve_angles():
 def align_angles():
     #retrieve necessary data from frontend
     structure_details = request.get_json()
-    phi_map = (structure_details["phi_angles"])
-    psi_map = (structure_details["psi_angles"])
+    segbeg = int((structure_details['segbeg']))
+    phi_angles = (structure_details["phi_angles"])
+    psi_angles = (structure_details["psi_angles"])
     phi_angle_settings = (structure_details['phiAngleSettings'])
     psi_angle_settings = (structure_details['psiAngleSettings'])
 
-    phi_targets = [
-        int(res) for res, val in phi_angle_settings.items()
-        if val == "targeted"
-    ]
-
-    psi_targets = [
-        int(res) for res, val in psi_angle_settings.items()
-        if val == "targeted"
-    ]
-
     target_residues_phi = [
-        [res, phi_map[str(res)]]
-        for res in phi_targets
-        if str(res) in phi_map and phi_map[str(res)] is not None
+        [int(res), phi_angles[int(res) - segbeg - 1]]
+        for res, val in phi_angle_settings.items()
+        if val == "targeted"
     ]
 
     target_residues_psi = [
-        [res, psi_map[str(res)]]
-        for res in psi_targets
-        if str(res) in psi_map and psi_map[str(res)] is not None
+        [int(res), psi_angles[int(res) - segbeg - 1]]
+        for res, val in psi_angle_settings.items()
+        if val == "targeted"
     ]
 
     constr_residues_phi = [
@@ -265,23 +245,25 @@ def update_angles():
 def collision_check():
     path = "scripts/LADH_loop_movement.pdb"
     structure = PDBParser().get_structure("collisionModel", path)
-    atoms = list(structure.get_atoms())
-    radius = 2
+    radius = 1.6
     collisions = []
-    ns = NeighborSearch(atoms)
-    for res1, res2 in ns.search_all(radius, level='R'):
-        if res1 != res2:
-            min_distance = min(
-                atom1 - atom2
-                for atom1 in res1.get_atoms()
-                for atom2 in res2.get_atoms()
-            )
+    for model in structure:
+        atoms = list(model.get_atoms())
+        ns = NeighborSearch(atoms)
+        for atom1, atom2 in ns.search_all(radius, level='A'):
+            res1 = atom1.get_parent()
+            res2 = atom2.get_parent()
 
-            collisions.append({
-                "res1": str(res1),
-                "res2": str(res2),
-                "distance": float(min_distance)
-            })
+            #discard collisions where the parent residues are the same, and those where the residues are adjacent
+            if abs(res1.get_id()[1] - res2.get_id()[1]) > 1:
+                distance = atom1 - atom2
+
+                collisions.append({
+                    "model": model.id,
+                    "res1": res1.get_id()[1],
+                    "res2": res2.get_id()[1],
+                    "distance": float(distance)
+                })
 
     return jsonify({"collisions": collisions})
 

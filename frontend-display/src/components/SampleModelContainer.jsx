@@ -30,7 +30,7 @@ function SampleModelContainer({data}) {
 
     return (
     <div id='sample-protein-model'>
-        <div class='protein-model' ref={containerRef}/>
+        <div className='sample-protein-model' ref={containerRef}/>
     </div>
     );
 }
