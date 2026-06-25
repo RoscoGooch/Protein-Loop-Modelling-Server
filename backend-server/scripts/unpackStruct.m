@@ -12,7 +12,6 @@ function out = unpackStruct(s)
             end
         end
 
-    
     elseif isstruct(s)
         fn = fieldnames(s);
         out = struct();
@@ -22,7 +21,6 @@ function out = unpackStruct(s)
         end
 
     else
-        % base case, such as numerical, char and logical values
         out = s;
     end
 end
